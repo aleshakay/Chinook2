@@ -1,49 +1,53 @@
-﻿using System;
+﻿
+using System;
 using System.Collections.Generic;
 using System.Data.SqlClient;
+using System.Linq;
+using System.Threading.Tasks;
 using Chinook.Model;
+using Dapper;
 
-namespace Chinook.Data
+namespace Chinook.DataAccess
 {
     public class CustomerRepository
     {
-        const string ConnectionString = "Server=localhost;Database=Chinook;Trusted_Connection=True";
+        const string ConnectionString = "Server=localhost;Database=Chinook;Trusted_Connection=True;";
 
-        public List<Customer> GetByCountry(string country)
+        public IEnumerable<Customer> GetCustomersByCountry(string country)
         {
             var sql = @"
-                select
-                    FirstName,
-                    LastName,
-                    CustomerId,
-                    Country
-                from Customer
-                where Customer.Country = @Country";
+                      select *
+                      from Customer
+                      where Country = @Country  
+                      ";
 
             using (var db = new SqlConnection(ConnectionString))
             {
-                db.Open();
-
-                var cmd = db.CreateCommand();
-                cmd.CommandText = sql;
-                cmd.Parameters.AddWithValue("Country", country);
-
-                var reader = cmd.ExecuteReader();
-                var customers = new List<Customer>();
-                while (reader.Read())
-                {
-                    var customer = new Customer
-                    {
-                        FirstName = (string)reader["FirstName"],
-                        LastName = (string)reader["LastName"],
-                        CustomerId = (int)reader["CustomerId"],
-                        Country = (string)reader["Country"]
-                    };
-
-                    customers.Add(customer);
-                }
-                return customers;
+                var parameters = new { Country = country };
+                var result = db.Query<Customer>(sql, parameters);
+                return result;
             }
         }
+
+        public IEnumerable<Invoice> GetAllInvoicesByCountry(string country)
+        {
+            var sql = @"
+                        select (Customer.FirstName + ' ' + Customer.LastName) as FullName, InvoiceId, InvoiceDate, BillingCountry
+                        from Invoice
+	                        join Customer
+		                        on invoice.CustomerId = customer.CustomerId
+                        where BillingCountry = @Country
+                        order by customer.LastName;
+                      ";
+
+            using (var db = new SqlConnection(ConnectionString))
+            {
+                var parameters = new { Country = country };
+                var result = db.Query<Invoice>(sql, parameters);
+                return result;
+            }
+        }
+
     }
 }
+        
